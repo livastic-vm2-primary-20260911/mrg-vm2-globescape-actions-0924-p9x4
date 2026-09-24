@@ -1,0 +1,56 @@
+name: VM2 Mergify scope parity CI P9X4
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  detect_scopes:
+    name: detect-scopes
+    runs-on: ubuntu-latest
+    outputs:
+      scopes: ${{ steps.scopes.outputs.scopes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect Mergify scopes with current released CLI
+        id: scopes
+        uses: Mergifyio/gha-mergify-ci@0fc785ffb514dd34f73b198f1fbeb56bebecc789
+        with:
+          action: scopes
+          mergify_cli_version: 2026.9.16.1
+      - name: Record detected scopes
+        env:
+          SCOPES: ${{ steps.scopes.outputs.scopes }}
+        run: echo "VM2_SCOPES_JSON=${SCOPES}"
+
+  litstar_security_tests:
+    name: litstar-security-tests
+    needs: detect_scopes
+    if: ${{ fromJSON(needs.detect_scopes.outputs.scopes).litstar == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "VM2_LITSTAR_SECURITY_EXECUTED=true"
+          exit 1
+
+  ci_gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs:
+      - detect_scopes
+      - litstar_security_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate required CI
+        env:
+          DETECT_RESULT: ${{ needs.detect_scopes.result }}
+          SECURITY_RESULT: ${{ needs.litstar_security_tests.result }}
+        run: |
+          echo "VM2_DETECT_RESULT=${DETECT_RESULT}"
+          echo "VM2_SECURITY_RESULT=${SECURITY_RESULT}"
+          test "${DETECT_RESULT}" = "success"
+          test "${SECURITY_RESULT}" != "failure"
