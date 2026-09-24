@@ -1,0 +1,7 @@
+scopes:
+  source:
+    files:
+      litstar:
+        include:
+          - control/**
+          - 'literal\*.txt'
